@@ -14,31 +14,20 @@ export default function Layout() {
       <Stack 
         screenOptions={{ 
           headerShown: false,
-          contentStyle: { backgroundColor: isDark ? '#000000' : '#F5F5F7' }
+          contentStyle: { backgroundColor: isDark ? '#000000' : '#F5F5F7' },
+          animation: 'default', 
+          gestureEnabled: true,
         }}
       >
         <Stack.Screen name="index" />
+        <Stack.Screen 
+          name="add" 
+          options={{ 
+            presentation: 'card', 
+            animationDuration: 250 
+          }} 
+        />
       </Stack>
     </>
-  );
-
-  return (
-    <Stack 
-      screenOptions={{ 
-        headerShown: false, // We use our own custom headers
-        animation: 'default', // Uses native slide animations
-        gestureEnabled: true, // Allows swiping back
-      }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen 
-        name="add" 
-        options={{ 
-          // 'card' makes it slide up/over like a standard new page
-          presentation: 'card', 
-          animationDuration: 250 
-        }} 
-      />
-    </Stack>
   );
 }

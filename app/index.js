@@ -4,9 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as Haptics from 'expo-haptics'; // Import Haptics here
+import * as Haptics from 'expo-haptics';
 import { initDatabase, getActivitiesByDate, deleteActivities, getAllActivities, toggleActivityCompletion } from '../src/db/database';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -149,7 +149,7 @@ export default function HomeScreen() {
         });
 
         const fileUri = FileSystem.documentDirectory + 'daily_log_export.csv';
-        await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+        await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
         await Sharing.shareAsync(fileUri);
     } catch (e) {
         Alert.alert("Export Failed", e.message);
@@ -184,7 +184,6 @@ export default function HomeScreen() {
     if (selectionMode) return;
     toggleActivityCompletion(id, currentStatus);
     loadData();
-    // FIXED: Haptics Error Handling
     if (Platform.OS !== 'web') {
         try { await Haptics.selectionAsync(); } catch (e) {}
     }
@@ -223,13 +222,12 @@ export default function HomeScreen() {
         ) : (
           <TouchableOpacity onPress={() => toggleCheck(item.id, item.isCompleted)} style={{ paddingRight: 15 }}>
              <View style={[styles.checkCircle, { borderColor: isCompleted ? theme.subText : theme.checkCircle, backgroundColor: isCompleted ? theme.subText : 'transparent' }]}>
-                 {isCompleted && <Ionicons name="checkmark" size={14} color={theme.card} />}
+                 {isCompleted && <Ionicons name="checkmark" size={12} color={theme.card} />}
              </View>
           </TouchableOpacity>
         )}
 
         <View style={styles.cardContent}>
-          {/* UPDATED: Wider container, smaller font for single line */}
           <View style={[styles.timeContainer, { borderRightColor: theme.border }]}>
             <Text style={[styles.timeText, { color: theme.text }]} numberOfLines={1}>
               {moment(item.startTime).format('h:mm A')} - {moment(item.endTime).format('h:mm A')}
@@ -309,15 +307,22 @@ export default function HomeScreen() {
 
       <View style={[styles.bottomBar, { backgroundColor: theme.bg }]}> 
         {selectionMode ? (
-          <View style={styles.actionRow}>
-             {selectedIds.size === 1 && (
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.arrowBg }]} onPress={handleEdit}>
-                  <Text style={{color: theme.text, fontWeight: '600'}}>Edit</Text>
-                </TouchableOpacity>
-             )}
-             <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.danger }]} onPress={handleDelete}>
-                <Text style={{color: '#FFF', fontWeight: '600'}}>Delete ({selectedIds.size})</Text>
+          <View style={styles.selectionBar}>
+             {/* DONE BUTTON MOVED HERE */}
+             <TouchableOpacity style={[styles.doneButtonInline, { backgroundColor: theme.doneBtn }]} onPress={cancelSelection}>
+                <Text style={{ color: theme.accent, fontWeight: '700' }}>Done</Text>
              </TouchableOpacity>
+
+             <View style={styles.actionRow}>
+                {selectedIds.size === 1 && (
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.arrowBg }]} onPress={handleEdit}>
+                    <Text style={{color: theme.text, fontWeight: '600'}}>Edit</Text>
+                    </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.danger }]} onPress={handleDelete}>
+                    <Text style={{color: '#FFF', fontWeight: '600'}}>Delete ({selectedIds.size})</Text>
+                </TouchableOpacity>
+             </View>
           </View>
         ) : (
           <TouchableOpacity 
@@ -328,12 +333,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
       </View>
-
-      {selectionMode && (
-        <TouchableOpacity style={[styles.cancelButton, { backgroundColor: theme.doneBtn }]} onPress={cancelSelection}>
-          <Text style={{ color: theme.accent, fontWeight: '600' }}>Done</Text>
-        </TouchableOpacity>
-      )}
     </SafeAreaView>
   );
 }
@@ -345,7 +344,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
   navButton: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   exportBtn: { position: 'absolute', right: 20 },
-  cancelButton: { position: 'absolute', top: 60, right: 20, zIndex: 20, padding: 8, borderRadius: 8, elevation: 2 },
+  // REMOVED OLD ABSOLUTE CANCEL BUTTON
   pickerPanel: { borderBottomWidth: 1, paddingBottom: 10 },
   pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
   wheelContainer: { flexDirection: 'row', justifyContent: 'center', height: ITEM_HEIGHT * 3, width: 230 },
@@ -358,20 +357,23 @@ const styles = StyleSheet.create({
   quoteText: { fontSize: 18, fontStyle: 'italic', textAlign: 'center', marginBottom: 5, fontWeight: '300' },
   quoteAuthor: { fontSize: 12, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1 },
   card: { flexDirection: 'row', padding: 12, borderRadius: 16, marginBottom: 5, alignItems: 'center', elevation: 1 },
-  cardContent: { flex: 1, flexDirection: 'row', alignItems: 'center' }, // Aligns time and info
+  cardContent: { flex: 1, flexDirection: 'row', alignItems: 'center' }, 
   selectIcon: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, marginRight: 15, justifyContent: 'center', alignItems: 'center' },
   selectDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#fff' },
   checkCircle: { width: 20, height: 20, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  
-  // UPDATED TIME CONTAINER
   timeContainer: { width: 102, borderRightWidth: 1, alignItems: 'flex-end', paddingRight: 8, justifyContent: 'center' },
   timeText: { fontSize: 12, fontWeight: '600' }, 
   infoContainer: { flex: 1, paddingLeft: 8 },
   typeText: { fontSize: 15, fontWeight: '700' },
   durationText: { fontSize: 12, fontWeight: '600' },
   noteText: { fontSize: 14, marginTop: 4 },
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, alignItems: 'center', justifyContent: 'center' },
+  
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, alignItems: 'center', justifyContent: 'center' },
   fab: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 4 },
-  actionRow: { flexDirection: 'row', gap: 15, marginBottom: 20 },
+  
+  // NEW STYLES FOR SELECTION MODE
+  selectionBar: { alignItems: 'center', width: '100%', paddingBottom: 20 },
+  doneButtonInline: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, marginBottom: 15, elevation: 2 },
+  actionRow: { flexDirection: 'row', gap: 15 },
   actionBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25, elevation: 3 },
 });
