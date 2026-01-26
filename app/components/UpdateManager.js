@@ -4,8 +4,7 @@ import * as Updates from 'expo-updates';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
-// CHANGE THIS to your raw GitHub URL after you push your version.json
-const NATIVE_VERSION_URL = 'https://raw.githubusercontent.com/YOUR_USERNAME/tempus/main/version.json';
+const NATIVE_VERSION_URL = 'https://raw.githubusercontent.com/bvn1904/tempus/main/version.json';
 
 export default function UpdateManager() {
   useEffect(() => {
