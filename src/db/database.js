@@ -58,7 +58,7 @@ export const getActivitiesByDate = (timestamp) => {
   end.setHours(23, 59, 59, 999);
 
   return db.getAllSync(
-    'SELECT * FROM activities WHERE startTime >= ? AND startTime <= ? ORDER BY startTime DESC',
+    'SELECT * FROM activities WHERE startTime >= ? AND startTime <= ? ORDER BY startTime ASC',
     [start.getTime(), end.getTime()]
   );
 };
@@ -82,5 +82,5 @@ export const getMostFrequentActivities = () => {
 };
 
 export const getAllActivities = () => {
-  return db.getAllSync('SELECT * FROM activities ORDER BY startTime DESC');
+  return db.getAllSync('SELECT * FROM activities ORDER BY startTime ASC');
 };
