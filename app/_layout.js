@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
+import UpdateManager from './components/UpdateManager';
 
 export default function Layout() {
   const colorScheme = useColorScheme();
@@ -8,6 +9,7 @@ export default function Layout() {
 
   return (
     <>
+      <UpdateManager />
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack 
         screenOptions={{ 
