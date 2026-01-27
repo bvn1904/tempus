@@ -52,7 +52,7 @@ export default function UpdateManager() {
                 showOTAUpdateAlert();
             } else {
                 // Optional: Uncomment for debugging
-                Alert.alert("No Update", "You have the latest version."); 
+                // Alert.alert("No Update", "You have the latest version."); 
             }
         }
     } catch (e) {
