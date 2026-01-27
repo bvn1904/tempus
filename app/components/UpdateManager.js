@@ -23,29 +23,40 @@ export default function UpdateManager() {
         }
     }
 
+   // --- CHECK A: Native Update (GitHub) ---
+    // We wrap this in its OWN try/catch so it doesn't kill the app update
     try {
-        // --- STEP A: Check for Native Update (New APK) ---
-        // Fetch version.json from GitHub
         const response = await fetch(NATIVE_VERSION_URL);
-        const remoteData = await response.json();
-        
-        // Compare current app version (from app.json) with GitHub version
-        const currentVersion = Constants.expoConfig.version;
-        
-        if (compareVersions(remoteData.version, currentVersion) > 0) {
-            showNativeUpdateAlert(remoteData.downloadUrl);
-            return; // Stop here if native update is needed (priority)
+        // Only parse if the response is actually OK (200)
+        if (response.ok) {
+            const remoteData = await response.json();
+            const currentVersion = Constants.expoConfig.version;
+            
+            if (compareVersions(remoteData.version, currentVersion) > 0) {
+                showNativeUpdateAlert(remoteData.downloadUrl);
+                return; // Priority: If native update exists, stop here.
+            }
+        } else {
+            console.log("GitHub version check skipped (404 or Private Repo)");
         }
+    } catch (e) {
+        console.log("Native check failed (ignoring):", e);
+    }
 
-        // --- STEP B: Check for OTA Update (JS Changes) ---
-        if (!__DEV__) { // Only check in production/preview
+    // --- CHECK B: OTA Update (Expo) ---
+    // This now runs even if GitHub fails
+    try {
+        if (!__DEV__) { 
             const update = await Updates.checkForUpdateAsync();
             if (update.isAvailable) {
                 showOTAUpdateAlert();
+            } else {
+                // Optional: Uncomment for debugging
+                Alert.alert("No Update", "You have the latest version."); 
             }
         }
     } catch (e) {
-        console.log("Update check failed:", e);
+        console.log("OTA update check failed:", e);
     }
   };
 

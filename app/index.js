@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, useColorScheme, LayoutAnimation, Platform, UIManager, Alert, Pressable, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, useColorScheme, LayoutAnimation, Platform, UIManager, Alert, Pressable, TouchableWithoutFeedback, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,13 +9,15 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { initDatabase, getActivitiesByDate, deleteActivities, getAllActivities, toggleActivityCompletion } from '../src/db/database';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-// --- CONFIG ---
 const ITEM_HEIGHT = 40; 
 const LOOPS = 300; 
+
+const SPRING_CONFIG = {
+  duration: 300,
+  create: { type: LayoutAnimation.Types.spring, property: LayoutAnimation.Properties.opacity, springDamping: 0.7 },
+  update: { type: LayoutAnimation.Types.spring, springDamping: 0.7 },
+  delete: { type: LayoutAnimation.Types.linear, property: LayoutAnimation.Properties.opacity, duration: 200 }
+};
 
 const DateWheel = ({ currentDate, onDateChange, isDark }) => {
   const currentYear = new Date().getFullYear();
@@ -55,7 +57,7 @@ const DateWheel = ({ currentDate, onDateChange, isDark }) => {
 
     return (
       <View style={styles.wheelColumn}>
-        <View style={[styles.wheelHighlight, { top: ITEM_HEIGHT }]} />
+        <View style={[styles.wheelHighlight, { top: ITEM_HEIGHT, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]} />
         <FlatList
           ref={flatListRef}
           data={renderData}
@@ -76,7 +78,7 @@ const DateWheel = ({ currentDate, onDateChange, isDark }) => {
              return (
                <TouchableOpacity 
                   style={[styles.wheelItem, { opacity: isSelected ? 1 : 0.5, transform: [{ scale: isSelected ? 1.05 : 0.95 }] }]} 
-                  activeOpacity={1} 
+                  activeOpacity={0.7} 
                   onPress={() => updateDate(type, item)}
                >
                  <Text style={{ fontSize: 17, fontWeight: isSelected ? '700' : '500', color: isSelected ? activeColor : passiveColor }}>
@@ -110,17 +112,18 @@ export default function HomeScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const theme = {
-    bg: isDark ? '#000000' : '#F2F2F7',
+    bg: isDark ? '#121212' : '#F2F2F7',
     text: isDark ? '#FFFFFF' : '#000000',
     card: isDark ? '#1C1C1E' : '#FFFFFF',
     subText: '#8E8E93',
-    border: isDark ? '#38383A' : '#E5E5EA',
-    accent: '#007AFF',
-    danger: '#FF3B30',
-    arrowBg: isDark ? '#1C1C1E' : '#E5E5EA',
-    quoteText: isDark ? '#555' : '#AAA',
-    doneBtn: isDark ? '#1C1C1E' : '#FFFFFF', 
-    checkCircle: isDark ? '#38383A' : '#C7C7CC',
+    hintText: '#48484A',
+    border: isDark ? '#2C2C2E' : '#E5E5EA',
+    accent: '#4A90D9', // Muted Premium Blue
+    danger: '#FF453A', // Softer Red
+    arrowBg: isDark ? '#121212' : '#F2F2F7',
+    quoteText: isDark ? '#636366' : '#AAA',
+    doneBtn: isDark ? '#2C2C2E' : '#FFFFFF', 
+    checkCircle: isDark ? '#3A3A3C' : '#C7C7CC',
   };
 
   useEffect(() => { initDatabase(); }, []);
@@ -148,7 +151,13 @@ export default function HomeScreen() {
             csv += `${date},${time},"${item.type}",${duration},${status},${note}\n`;
         });
 
-        const fileUri = FileSystem.documentDirectory + 'daily_log_export.csv';
+        const fileUri = FileSystem.documentDirectory + 'log_export.csv';
+        // Web support check
+        // if(Platform.OS === 'web') {
+        //    // Basic web export logic could go here
+        //    Alert.alert("Web Export", "CSV generation not fully supported on web demo.");
+        //    return;
+        // }
         await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
         await Sharing.shareAsync(fileUri);
     } catch (e) {
@@ -182,11 +191,16 @@ export default function HomeScreen() {
 
   const toggleCheck = async (id, currentStatus) => {
     if (selectionMode) return;
+    
+    // // Haptic Delay Logic
+    // if (Platform.OS !== 'web') {
+    //     setTimeout(async () => {
+    //         try { await Haptics.selectionAsync(); } catch (e) {}
+    //     }, 10);
+    // }
+
     toggleActivityCompletion(id, currentStatus);
     loadData();
-    if (Platform.OS !== 'web') {
-        try { await Haptics.selectionAsync(); } catch (e) {}
-    }
   };
 
   const cancelSelection = () => {
@@ -195,13 +209,14 @@ export default function HomeScreen() {
   };
 
   const changeDate = (days) => {
+    LayoutAnimation.configureNext(SPRING_CONFIG); // Use spring config
     const newDate = new Date(currentDate);
     newDate.setDate(newDate.getDate() + days);
     setCurrentDate(newDate);
   };
 
   const togglePicker = () => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowDatePicker(!showDatePicker); };
-  const jumpToToday = () => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setCurrentDate(new Date()); setShowDatePicker(false); };
+  const jumpToToday = () => { LayoutAnimation.configureNext(SPRING_CONFIG); setCurrentDate(new Date()); setShowDatePicker(false); };
   const formatHeaderDate = (date) => `W${moment(date).format('WW')} ${moment(date).format('MMM D ddd')}`;
 
   const renderItem = ({ item }) => {
@@ -215,17 +230,19 @@ export default function HomeScreen() {
         activeOpacity={0.7}
         style={[styles.card, { backgroundColor: theme.card, opacity: isCompleted ? 0.6 : 1 }]}
       >
-        {selectionMode ? (
-          <View style={[styles.selectIcon, { borderColor: isSelected ? theme.accent : theme.subText, backgroundColor: isSelected ? theme.accent : 'transparent' }]}>
-            {isSelected && <View style={styles.selectDot} />} 
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => toggleCheck(item.id, item.isCompleted)} style={{ paddingRight: 15 }}>
-             <View style={[styles.checkCircle, { borderColor: isCompleted ? theme.subText : theme.checkCircle, backgroundColor: isCompleted ? theme.subText : 'transparent' }]}>
-                 {isCompleted && <Ionicons name="checkmark" size={12} color={theme.card} />}
-             </View>
-          </TouchableOpacity>
-        )}
+        <View style={styles.leftActionArea}>
+            {selectionMode ? (
+            <View style={[styles.selectIcon, { borderColor: isSelected ? theme.accent : theme.subText, backgroundColor: isSelected ? theme.accent : 'transparent' }]}>
+                {isSelected && <View style={styles.selectDot} />} 
+            </View>
+            ) : (
+            <TouchableOpacity onPress={() => toggleCheck(item.id, item.isCompleted)} style={styles.checkTouchArea}>
+                <View style={[styles.checkCircle, { borderColor: isCompleted ? theme.subText : theme.checkCircle, backgroundColor: isCompleted ? theme.subText : 'transparent' }]}>
+                    {isCompleted && <Ionicons name="checkmark" size={12} color={theme.card} />}
+                </View>
+            </TouchableOpacity>
+            )}
+        </View>
 
         <View style={styles.cardContent}>
           <View style={[styles.timeContainer, { borderRightColor: theme.border }]}>
@@ -305,24 +322,28 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View style={[styles.bottomBar, { backgroundColor: theme.bg }]}> 
+         <View style={[styles.bottomBar, { backgroundColor: theme.bg }]}> 
         {selectionMode ? (
           <View style={styles.selectionBar}>
-             {/* DONE BUTTON MOVED HERE */}
-             <TouchableOpacity style={[styles.doneButtonInline, { backgroundColor: theme.doneBtn }]} onPress={cancelSelection}>
-                <Text style={{ color: theme.accent, fontWeight: '700' }}>Done</Text>
+             {/* 1. EDIT BUTTON (Only if 1 item selected) */}
+             {selectedIds.size === 1 ? (
+                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.doneBtn }]} onPress={handleEdit}>
+                   <Text style={{color: theme.text, fontWeight: '600', fontSize: 15}}>Edit</Text>
+                </TouchableOpacity>
+             ) : (
+                // Spacer to keep layout balanced if you want, or just empty
+                <View style={{ width: 0 }} />
+             )}
+
+             {/* 2. DONE BUTTON (Center) */}
+             <TouchableOpacity style={[styles.doneButtonRow, { backgroundColor: theme.doneBtn }]} onPress={cancelSelection}>
+                <Text style={{ color: theme.accent, fontWeight: '700', fontSize: 15 }}>Done</Text>
              </TouchableOpacity>
 
-             <View style={styles.actionRow}>
-                {selectedIds.size === 1 && (
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.arrowBg }]} onPress={handleEdit}>
-                    <Text style={{color: theme.text, fontWeight: '600'}}>Edit</Text>
-                    </TouchableOpacity>
-                )}
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.danger }]} onPress={handleDelete}>
-                    <Text style={{color: '#FFF', fontWeight: '600'}}>Delete ({selectedIds.size})</Text>
-                </TouchableOpacity>
-             </View>
+             {/* 3. DELETE BUTTON (Right) */}
+             <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.danger }]} onPress={handleDelete}>
+                <Text style={{color: '#FFF', fontWeight: '600', fontSize: 14}}>Delete ({selectedIds.size})</Text>
+             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity 
@@ -333,7 +354,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
       </View>
-    </SafeAreaView>
+          </SafeAreaView>
   );
 }
 
@@ -341,26 +362,32 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1 },
   navGroup: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  headerTitle: { fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
-  navButton: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.5 }, // Tightened tracking
+  navButton: { width: 32, height: 32, borderRadius: 0, justifyContent: 'center', alignItems: 'center' },
   exportBtn: { position: 'absolute', right: 20 },
-  // REMOVED OLD ABSOLUTE CANCEL BUTTON
+  
   pickerPanel: { borderBottomWidth: 1, paddingBottom: 10 },
   pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
   wheelContainer: { flexDirection: 'row', justifyContent: 'center', height: ITEM_HEIGHT * 3, width: 230 },
   wheelColumn: { flex: 1, alignItems: 'center' },
   wheelItem: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center' },
-  wheelHighlight: { position: 'absolute', width: '100%', height: ITEM_HEIGHT, backgroundColor: 'transparent' },
+  wheelHighlight: { position: 'absolute', width: '100%', height: ITEM_HEIGHT, borderRadius: 12 },
   todayButton: { paddingVertical: 6, paddingHorizontal: 8, marginLeft: 0, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(128,128,128,0.3)' },
+  
   listContent: { padding: 16, paddingBottom: 100 },
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   quoteText: { fontSize: 18, fontStyle: 'italic', textAlign: 'center', marginBottom: 5, fontWeight: '300' },
   quoteAuthor: { fontSize: 12, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1 },
-  card: { flexDirection: 'row', padding: 12, borderRadius: 16, marginBottom: 5, alignItems: 'center', elevation: 1 },
+  
+  card: { flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 10, borderRadius: 16, marginBottom: 5, alignItems: 'center', elevation: 1 },
+  leftActionArea: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  checkTouchArea: { padding: 1 },
   cardContent: { flex: 1, flexDirection: 'row', alignItems: 'center' }, 
-  selectIcon: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, marginRight: 15, justifyContent: 'center', alignItems: 'center' },
-  selectDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#fff' },
-  checkCircle: { width: 20, height: 20, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  
+  selectIcon: { width: 22, height: 22, borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  selectDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff' },
+  checkCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  
   timeContainer: { width: 102, borderRightWidth: 1, alignItems: 'flex-end', paddingRight: 8, justifyContent: 'center' },
   timeText: { fontSize: 12, fontWeight: '600' }, 
   infoContainer: { flex: 1, paddingLeft: 8 },
@@ -369,11 +396,9 @@ const styles = StyleSheet.create({
   noteText: { fontSize: 14, marginTop: 4 },
   
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, alignItems: 'center', justifyContent: 'center' },
-  fab: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 4 },
+  fab: { width: 53, height: 53, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 4 },
   
-  // NEW STYLES FOR SELECTION MODE
-  selectionBar: { alignItems: 'center', width: '100%', paddingBottom: 20 },
-  doneButtonInline: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, marginBottom: 15, elevation: 2 },
-  actionRow: { flexDirection: 'row', gap: 15 },
-  actionBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25, elevation: 3 },
-});
+  selectionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 20, paddingBottom: 20, gap: 12 },
+  actionBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 18, minWidth: 70, alignItems: 'center', elevation: 2 },
+  doneButtonRow: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 18, elevation: 3, minWidth: 60, alignItems: 'center' },
+  });
